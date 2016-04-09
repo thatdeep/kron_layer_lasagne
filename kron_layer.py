@@ -92,20 +92,24 @@ class KronLayer(lasagne.layers.Layer):
     def __init__(self, incoming, num_units, shape1, shape2, param_density=1.0, **kwargs):
         super(KronLayer, self).__init__(incoming, **kwargs)
 
-        num_inputs = int(np.prod(self.input_shape[1:]))
-
-        assert(shape1[0] * shape2[0] == num_inputs and shape1[1] * shape2[1] == num_units)
-        big_shape = (int(np.prod(shape1)), int(np.prod(shape2)))
-        self.r = max(1, int(param_density * min(big_shape)))
-        self.shape1, self.shape2 = shape1, shape2
-        self.manifold = FixedRankEmbeeded(*big_shape, self.r)
+        self.num_inputs = int(np.prod(self.input_shape[1:]))
         self.num_units = num_units
+        self.shape = (self.num_inputs, self.num_units)
+        if shape1[0] * shape2[0] == self.num_inputs and shape1[1] * shape2[1] == self.num_units:
+            raise ValueError('products of shape1 and shape2 must match shape, but they have values {}, {}, {}'.\
+                             format(shape1, shape2, self.shape))
+        self.kron_shape = (int(np.prod(shape1)), int(np.prod(shape2)))
+        self.r = max(1, int(param_density * min(self.kron_shape)))
+        self.shape1, self.shape2 = shape1, shape2
+
+        self.manifold = FixedRankEmbeeded(*self.kron_shape, self.r)
+
         U, S, V = self.manifold.rand_np()
 
         # give proper names
-        self.U = self.add_param(U, (big_shape[0], self.r), name="U", regularizable=False)
+        self.U = self.add_param(U, (self.kron_shape[0], self.r), name="U", regularizable=False)
         self.S = self.add_param(S, (self.r, self.r), name="S", regularizable=True)
-        self.V = self.add_param(V, (self.r, big_shape[1]), name="V", regularizable=False)
+        self.V = self.add_param(V, (self.r, self.kron_shape[1]), name="V", regularizable=False)
 
         self.op = KronStep(self.manifold, self.shape1, self.shape2)
 

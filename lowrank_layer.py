@@ -18,26 +18,19 @@ class DotStep(theano.gof.Op):
 
     def perform(self, node, inputs, output_storage):
         xin, u, s, v = inputs
-        #print(np.linalg.norm(u), np.linalg.norm(s), np.linalg.norm(v))
-        #print("w norm: {}".format(np.linalg.norm(w, axis=0)))
-        #print(type(xin), xin.shape)
 
         if xin.ndim > 2:
             # if the input has more than two dimensions, flatten it into a
             # batch of feature vectors.
             xin = np.reshape(xin, (xin.shape[0], -1))
             #xin = xin.flatten(2)
-        #print(xin)
-        #print('_--_')
 
         activation = xin.dot(u).dot(s).dot(v)
-        #print("activation norm:{}".format(np.linalg.norm(activation, axis=0)))
         xout, = output_storage
         xout[0] = activation
 
     def grad(self, input, output_gradients):
         xin, u, s, v = input
-        #print("x: {}, w: {}".format(type(xin), type(w)))
         if xin.ndim > 2:
             # if the input has more than two dimensions, flatten it into a
             # batch of feature vectors.
@@ -54,21 +47,21 @@ class DotStep(theano.gof.Op):
 
 
 class DotLayer2(lasagne.layers.Layer):
-    def __init__(self, incoming, num_units, W=lasagne.init.GlorotUniform(), **kwargs):
+    def __init__(self, incoming, num_units, param_density, **kwargs):
         super(DotLayer2, self).__init__(incoming, **kwargs)
 
         num_inputs = int(np.prod(self.input_shape[1:]))
-
-        self.r = 3
-        self.manifold = FixedRankEmbeeded(num_inputs, num_units, self.r)
+        self.num_inputs = num_inputs
         self.num_units = num_units
+        self.shape = (self.num_inputs, self.num_units)
+        self.r = max(1, int(param_density * min(self.shape)))
+
+        self.manifold = FixedRankEmbeeded(*self.shape, self.r)
         U, S, V = self.manifold.rand_np()
         # give proper names
-        self.U = self.add_param(U, (num_inputs, self.r), name="U", regularizable=False)
+        self.U = self.add_param(U, (self.num_inputs, self.r), name="U", regularizable=False)
         self.S = self.add_param(S, (self.r, self.r), name="S", regularizable=True)
-        self.V = self.add_param(V, (self.r, num_units), name="V", regularizable=False)
-        #self.W = self.add_param(self.manifold.rand(name="USV"), (num_inputs, num_units), name="W")
-        #self.W = self.manifold._normalize_columns(self.W)
+        self.V = self.add_param(V, (self.r, self.num_units), name="V", regularizable=False)
         self.op = DotStep(self.manifold)
 
     def get_output_shape_for(self, input_shape):
