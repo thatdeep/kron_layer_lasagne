@@ -65,6 +65,7 @@ class KronStep(theano.gof.Op):
 
     def grad(self, input, output_gradients):
         xin, u, s, v = input
+        xin_shape = xin.shape
         if xin.ndim > 2:
             # if the input has more than two dimensions, flatten it into a
             # batch of feature vectors.
@@ -84,23 +85,25 @@ class KronStep(theano.gof.Op):
             xin_grad = xin_grad + apply_mat_to_kron(out_grad,
                                u[:, i].reshape(self.shape1[::-1]),
                                w[i, :].reshape(self.shape2[::-1]))
+        xin_grad = xin_grad.reshape(xin_shape)
 
         return [xin_grad, *w_rgrad]
 
 
 class KronLayer(lasagne.layers.Layer):
-    def __init__(self, incoming, num_units, shape1, shape2, param_density=1.0, **kwargs):
+    def __init__(self, incoming, num_units, shape2, param_density=1.0, **kwargs):
         super(KronLayer, self).__init__(incoming, **kwargs)
 
         self.num_inputs = int(np.prod(self.input_shape[1:]))
         self.num_units = num_units
         self.shape = (self.num_inputs, self.num_units)
-        if shape1[0] * shape2[0] == self.num_inputs and shape1[1] * shape2[1] == self.num_units:
-            raise ValueError('products of shape1 and shape2 must match shape, but they have values {}, {}, {}'.\
-                             format(shape1, shape2, self.shape))
-        self.kron_shape = (int(np.prod(shape1)), int(np.prod(shape2)))
+        self.shape2 = shape2
+        if self.shape[0] % self.shape2[0] != 0 or self.shape[1] % self.shape2[1] != 0:
+            raise ValueError('shape must divide exactly by shape2, but they have {}, {}'.format(self.shape, shape2))
+
+        self.shape1 = self.shape[0] // self.shape2[0], self.shape[1] // self.shape2[1]
+        self.kron_shape = (int(np.prod(self.shape1)), int(np.prod(self.shape2)))
         self.r = max(1, int(param_density * min(self.kron_shape)))
-        self.shape1, self.shape2 = shape1, shape2
 
         self.manifold = FixedRankEmbeeded(*self.kron_shape, self.r)
 

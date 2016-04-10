@@ -6,11 +6,11 @@ import theano.tensor as T
 from manifolds import FixedRankEmbeeded
 
 
-class DotStep(theano.gof.Op):
+class LowRankStep(theano.gof.Op):
     __props__ = ('manifold',)
 
     def __init__(self, manifold):
-        super(DotStep, self).__init__()
+        super(LowRankStep, self).__init__()
         self.manifold = manifold
 
     def make_node(self, x, u, s, v):
@@ -31,6 +31,7 @@ class DotStep(theano.gof.Op):
 
     def grad(self, input, output_gradients):
         xin, u, s, v = input
+        xin_shape = xin.shape
         if xin.ndim > 2:
             # if the input has more than two dimensions, flatten it into a
             # batch of feature vectors.
@@ -41,14 +42,14 @@ class DotStep(theano.gof.Op):
         w_egrad = xin.T.dot(out_grad)
         w_rgrad = self.manifold.egrad2rgrad((u, s, v), w_egrad)
 
-        xin_grad = out_grad.dot(v.T).dot(s.T).dot(u.T).reshape(xin.shape)
+        xin_grad = out_grad.dot(v.T).dot(s.T).dot(u.T).reshape(xin_shape)
 
         return [xin_grad, *w_rgrad]
 
 
-class DotLayer2(lasagne.layers.Layer):
+class LowRankLayer(lasagne.layers.Layer):
     def __init__(self, incoming, num_units, param_density, **kwargs):
-        super(DotLayer2, self).__init__(incoming, **kwargs)
+        super(LowRankLayer, self).__init__(incoming, **kwargs)
 
         num_inputs = int(np.prod(self.input_shape[1:]))
         self.num_inputs = num_inputs
@@ -62,7 +63,7 @@ class DotLayer2(lasagne.layers.Layer):
         self.U = self.add_param(U, (self.num_inputs, self.r), name="U", regularizable=False)
         self.S = self.add_param(S, (self.r, self.r), name="S", regularizable=True)
         self.V = self.add_param(V, (self.r, self.num_units), name="V", regularizable=False)
-        self.op = DotStep(self.manifold)
+        self.op = LowRankStep(self.manifold)
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], self.num_units)
