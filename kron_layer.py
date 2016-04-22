@@ -87,7 +87,7 @@ class KronStep(theano.gof.Op):
                                w[i, :].reshape(self.shape2[::-1]))
         xin_grad = xin_grad.reshape(xin_shape)
 
-        return [xin_grad, *w_rgrad]
+        return [xin_grad] + list(w_rgrad)
 
 
 class KronLayer(lasagne.layers.Layer):
@@ -105,7 +105,7 @@ class KronLayer(lasagne.layers.Layer):
         self.kron_shape = (int(np.prod(self.shape1)), int(np.prod(self.shape2)))
         self.r = max(1, int(param_density * min(self.kron_shape)))
 
-        self.manifold = FixedRankEmbeeded(*self.kron_shape, self.r)
+        self.manifold = FixedRankEmbeeded(*self.kron_shape, k=self.r)
 
         U, S, V = self.manifold.rand_np()
 

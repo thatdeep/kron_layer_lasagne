@@ -8,9 +8,10 @@ import theano.tensor as T
 from utils import custom_sgd, iterate_minibatches
 from kron_layer import KronLayer
 from lowrank_layer import LowRankLayer
+from multi_kron_layer import MultiKronLayer
 
 
-def build_custom_cnn(input_var=None, widths=None, drop_input=.0,
+def build_custom_cnn(input_var=None, widths=None, drop_input=.2,
                      drop_hidden=.5, type="dense", params=None):
     # By default, this creates the same network as `build_mlp`, but it can be
     # customized with respect to the number and size of hidden layers. This
@@ -32,11 +33,10 @@ def build_custom_cnn(input_var=None, widths=None, drop_input=.0,
     # Hidden layers and dropout:
     nonlin = lasagne.nonlinearities.rectify
 
-
     # Convolutional layer with 32 kernels of size 5x5. Strided and padded
     # convolutions are supported as well; see the docstring.
     network = lasagne.layers.Conv2DLayer(
-            network, num_filters=32, filter_size=(5, 5),
+            network, num_filters=4, filter_size=(3, 3),
             nonlinearity=lasagne.nonlinearities.rectify,
             W=lasagne.init.GlorotUniform())
     # Expert note: Lasagne provides alternative convolutional layers that
@@ -44,13 +44,14 @@ def build_custom_cnn(input_var=None, widths=None, drop_input=.0,
     # please see http://lasagne.readthedocs.org/en/latest/user/tutorial.html.
 
     # Max-pooling layer of factor 2 in both dimensions:
-    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+    #network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
     network = lasagne.layers.Conv2DLayer(
-            network, num_filters=32, filter_size=(5, 5),
+            network, num_filters=4, filter_size=(3, 3),
             nonlinearity=lasagne.nonlinearities.rectify)
-    network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+    #network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
+
 
     if drop_hidden:
         network = lasagne.layers.dropout(network, p=drop_hidden)
@@ -63,9 +64,11 @@ def build_custom_cnn(input_var=None, widths=None, drop_input=.0,
         manifolds["fixedrank0"] = network.manifold
     elif type == "kron":
         param_density = params.get('param_density', 1.0)
-        shape2 = params.get('shape2', (4, 4))
-        network = KronLayer(network, widths[0], shape2=shape2, param_density=param_density, name="kron_fixedrank0")
-        manifolds["kron_fixedrank0"] = network.manifold
+        #shape2 = params.get('shape2', (4, 4))
+        #network = KronLayer(network, widths[0], shape2=shape2, param_density=param_density, name="kron_fixedrank0")
+        mode = params.get('mode', 'f')
+        network = MultiKronLayer(network, widths[0], mode=mode, param_density=param_density, name="kron_fixedrank0")
+        manifolds.update(network.manifolds)
     else:
         raise ValueError("type must be one of 3 variants: 'dense', 'lowrank' or 'kron'")
     for width in widths[1:]:
@@ -85,20 +88,19 @@ def generate_train_acc(input_X=None, target_y=None, widths=None, type="dense", p
     widths = [100] if widths is None else widths
     params = {'param_density': 0.5 } if params is None else params
     dense_output, manifolds = build_custom_cnn(input_X, widths=widths, type=type, params=params)
-    #предсказание нейронки (theano-преобразование)
+
     y_predicted = lasagne.layers.get_output(dense_output)
 
-    #все веса нейронки (shared-переменные)
+
     all_weights = lasagne.layers.get_all_params(dense_output)
 
-    #функция ошибки - средняя кроссэнтропия
+
     loss = lasagne.objectives.categorical_crossentropy(y_predicted,target_y).mean()
     accuracy = lasagne.objectives.categorical_accuracy(y_predicted,target_y).mean()
 
-    #сразу посчитать словарь обновлённых значений с шагом по градиенту, как раньше
     updates_sgd = custom_sgd(loss, all_weights, learning_rate=0.01, manifolds=manifolds)
 
-    #функция, которая обучает сеть на 1 шаг и возвращащет значение функции потерь и точности
+
     train_fun = theano.function([input_X,target_y],[loss,accuracy],updates=updates_sgd)
     accuracy_fun = theano.function([input_X,target_y],accuracy)
     return train_fun, accuracy_fun
@@ -106,17 +108,17 @@ def generate_train_acc(input_X=None, target_y=None, widths=None, type="dense", p
 
 def comparison(X_train,y_train,X_val,y_val,X_test,y_test, kron_params=None):
     import pickle
-    kron_params = [{'param_density': p} for p in np.linspace(1.0, 0.0, 5, endpoint=False)] if kron_params is None else kron_params
-    num_epochs = 50 #количество проходов по данным
+    kron_params = [{'param_density': p} for p in np.linspace(1.0, 0.0, 2, endpoint=False)] if kron_params is None else kron_params
+    num_epochs = 2
 
-    batch_size = 100 #размер мини-батча
+    batch_size = 100
 
-    hidden_units = [256, 128]
+    hidden_units = [8]
 
     trains, accs = generate_train_acc(widths=hidden_units, type="dense")
     trains, accs = list(zip(*([(trains, accs)] + [generate_train_acc(widths=hidden_units, type="kron", params=kron_param) for kron_param in kron_params])))
 
-    names = ["dense", *["kron({})".format(p.values()) for p in kron_params]]
+    names = ["dense"] + ["kron({})".format(p.values()) for p in kron_params]
     results = {name: {} for name in names}
 
     for train, acc, res in zip(trains, accs, results.values()):
@@ -161,12 +163,15 @@ def comparison(X_train,y_train,X_val,y_val,X_test,y_test, kron_params=None):
             res["train_err"].append(train_err / train_batches)
             res["train_acc"].append(train_acc / train_batches * 100)
             res["val_acc"].append(val_acc / val_batches * 100)
+    for res in results.values():
+        res.pop('train_fun')
+        res.pop('accuracy_fun')
     with open("comparative_history.dict", 'wb') as pickle_file:
         pickle.dump(results, pickle_file)
 
 
 if __name__ == "__main__":
-    from mnist.mnist import load_dataset
+    from mnist import load_dataset
     X_train,y_train,X_val,y_val,X_test,y_test = load_dataset()
     print(X_train.shape,y_train.shape)
 

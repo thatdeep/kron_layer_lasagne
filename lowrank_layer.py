@@ -44,7 +44,7 @@ class LowRankStep(theano.gof.Op):
 
         xin_grad = out_grad.dot(v.T).dot(s.T).dot(u.T).reshape(xin_shape)
 
-        return [xin_grad, *w_rgrad]
+        return [xin_grad] + list(w_rgrad)
 
 
 class LowRankLayer(lasagne.layers.Layer):
@@ -57,7 +57,7 @@ class LowRankLayer(lasagne.layers.Layer):
         self.shape = (self.num_inputs, self.num_units)
         self.r = max(1, int(param_density * min(self.shape)))
 
-        self.manifold = FixedRankEmbeeded(*self.shape, self.r)
+        self.manifold = FixedRankEmbeeded(*self.shape, k=self.r)
         U, S, V = self.manifold.rand_np()
         # give proper names
         self.U = self.add_param(U, (self.num_inputs, self.r), name="U", regularizable=False)

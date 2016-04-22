@@ -33,12 +33,12 @@ def custom_sgd(loss_or_grads, params, learning_rate, manifolds=None):
 
         for manifold_name in manifolds:
             manifold_tuple, manifold_grads_tuple = list(zip(*tuple((param, grad) for (param, grad) in zip(params, grads)\
-                                                                   if manifold_name in param.name)))
+                                                                   if (hasattr(param, 'name') and manifold_name in param.name))))
             manifold_tuple = {manifold_name: manifold_tuple}
             manifold_grads_tuple = {manifold_name: manifold_grads_tuple}
 
             params, grads = list(zip(*tuple((param, grad) for (param, grad) in zip(params, grads)
-                                            if manifold_name not in param.name)))
+                                            if (hasattr(param, 'name') and manifold_name not in param.name))))
             params = [manifold_tuple] + list(params)
             grads = [manifold_grads_tuple] + list(grads)
 
