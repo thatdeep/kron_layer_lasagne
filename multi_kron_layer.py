@@ -39,6 +39,8 @@ class MultiKronLayer(lasagne.layers.Layer):
         self.mode = mode
 
         f, h, w = self.input_shape[1:]
+        print('dense parameters: {}'.format(np.prod(self.shape)))
+        print('input shape: {}'.format(self.input_shape))
 
         n_factor = max_sqrt_factor(num_units)
         self.kron_layers = []

@@ -113,7 +113,7 @@ class KronLayer(lasagne.layers.Layer):
         self.U = self.add_param(U, (self.kron_shape[0], self.r), name="U", regularizable=False)
         self.S = self.add_param(S, (self.r, self.r), name="S", regularizable=True)
         self.V = self.add_param(V, (self.r, self.kron_shape[1]), name="V", regularizable=False)
-
+        print('number_of_params for {}: {}'.format(self.name, np.prod(U.shape) + np.prod(S.shape) + np.prod(V.shape)))
         self.op = KronStep(self.manifold, self.shape1, self.shape2)
 
     def get_output_shape_for(self, input_shape):

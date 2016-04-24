@@ -223,9 +223,6 @@ def test_nn(X_train,y_train,X_val,y_val,X_test,y_test):
             val_acc / val_batches * 100))
 
 
-def train_acc(inputX, type="dense", params={'param_density': 0.1})
-
-
 def test_nn(X_train,y_train,X_val,y_val,X_test,y_test):
     input_X = T.tensor4("X")
     input_shape = [None,1,28,28]
