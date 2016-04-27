@@ -141,9 +141,9 @@ class FixedRankEmbeeded(Manifold):
         U, S, V = X
         dU, dS, dV = dX
 
-        ZV = dU.dot(np.linalg.inv(S))
+        ZV = dU.dot(tensor.diag(1.0 / tensor.diag(S)))
         UtZV = dS
-        ZtU = np.linalg.inv(S).dot(dV)
+        ZtU = tensor.diag(1.0 / tensor.diag(S)).dot(dV)
 
         Zproj = (ZV - U.dot(UtZV), UtZV, ZtU - (UtZV.dot(V)))
         return Zproj

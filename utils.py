@@ -51,7 +51,7 @@ def custom_sgd(loss_or_grads, params, learning_rate, manifolds=None):
             manifold = manifolds[manifold_name]
             if hasattr(manifold, "from_partial"):
                 param_updates = manifold.retr(param[manifold_name],
-                                              manifold.from_partial(grad[manifold_name]),
+                                              manifold.from_partial(param[manifold_name], grad[manifold_name]),
                                               -learning_rate)
             else:
                 param_updates = manifold.retr(param[manifold_name],
@@ -64,7 +64,7 @@ def custom_sgd(loss_or_grads, params, learning_rate, manifolds=None):
 
     return updates
 
-
+'''
 def adam(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
          beta2=0.999, epsilon=1e-8, manifolds=None):
     """Adam updates
@@ -155,7 +155,7 @@ def adam(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
 
     updates[t_prev] = t
     return updates
-
+'''
 
 def iterate_minibatches(X, y, batchsize):
         n_samples = X.shape[0]

@@ -158,7 +158,7 @@ class KronLayer(lasagne.layers.Layer):
             # if the input has more than two dimensions, flatten it into a
             # batch of feature vectors.
             input = input.flatten(2)
-        activation = np.zeros((input.shape[0], self.shape1[1] * self.shape2[1]))
+        activation = T.zeros((input.shape[0], self.shape1[1] * self.shape2[1]))
         w = self.S.dot(self.V)
         for i in range(self.manifold._k):
             activation += apply_mat_to_kron(input,
