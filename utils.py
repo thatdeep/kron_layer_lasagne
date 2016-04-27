@@ -49,7 +49,14 @@ def custom_sgd(loss_or_grads, params, learning_rate, manifolds=None):
         if param and isinstance(param, dict) and len(param) == 1 and isinstance(list(param.values())[0], tuple):# and "fixed_rank" in param[0].name:
             manifold_name = list(param.keys())[0]
             manifold = manifolds[manifold_name]
-            param_updates = manifold.retr(param[manifold_name], grad[manifold_name], -learning_rate)
+            if hasattr(manifold, "from_partial"):
+                param_updates = manifold.retr(param[manifold_name],
+                                              manifold.from_partial(grad[manifold_name]),
+                                              -learning_rate)
+            else:
+                param_updates = manifold.retr(param[manifold_name],
+                                              grad[manifold_name],
+                                              -learning_rate)
             for p, upd in zip(param[manifold_name], param_updates):
                 updates[p] = upd
         else:
@@ -127,7 +134,9 @@ def adam(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
                       for (value, p) in zip(values, param))
 
             m_t = manifold.lincomb(param, beta1, m_prev, (1 - beta1), g_t)
-            v_t = manifold.lincomb(param, beta1, m_prev, (1 - beta1), g_t)
+            #v_t = manifold.lincomb(param, beta2, m_prev, (1 - beta2), manifold.proj((g_ta[0].dot(g_ta[1]).dot(g_ta[2]))**2))
+            v_t = manifold.lincomb(param, beta2, m_prev, (1 - beta2), manifold.proj((g_t[0]**2, g_t[1]**2, g_t[2]**2), type='tan_vec'))
+            step =
 
         else:
             value = param.get_value(borrow=True)

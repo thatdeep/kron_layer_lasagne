@@ -121,3 +121,47 @@ class KronLayer(lasagne.layers.Layer):
 
     def get_output_for(self, input, **kwargs):
         return self.op(input, self.U, self.S, self.V)
+
+
+class KronLayer(lasagne.layers.Layer):
+    def __init__(self, incoming, num_units, shape2, param_density=1.0, **kwargs):
+        super(KronLayer, self).__init__(incoming, **kwargs)
+
+        self.num_inputs = int(np.prod(self.input_shape[1:]))
+        self.num_units = num_units
+        self.shape = (self.num_inputs, self.num_units)
+        self.shape2 = shape2
+        if self.shape[0] % self.shape2[0] != 0 or self.shape[1] % self.shape2[1] != 0:
+            raise ValueError('shape must divide exactly by shape2, but they have {}, {}'.format(self.shape, shape2))
+
+        self.shape1 = self.shape[0] // self.shape2[0], self.shape[1] // self.shape2[1]
+        self.kron_shape = (int(np.prod(self.shape1)), int(np.prod(self.shape2)))
+        self.r = max(1, int(param_density * min(self.kron_shape)))
+
+        self.manifold = FixedRankEmbeeded(*self.kron_shape, k=self.r)
+
+        U, S, V = self.manifold.rand_np()
+
+        # give proper names
+        self.U = self.add_param(U, (self.kron_shape[0], self.r), name="U", regularizable=False)
+        self.S = self.add_param(S, (self.r, self.r), name="S", regularizable=True)
+        self.V = self.add_param(V, (self.r, self.kron_shape[1]), name="V", regularizable=False)
+        print('number_of_params for {}: {}'.format(self.name, np.prod(U.shape) + np.prod(S.shape) + np.prod(V.shape)))
+        #self.op = KronStep(self.manifold, self.shape1, self.shape2)
+
+    def get_output_shape_for(self, input_shape):
+        return (input_shape[0], self.num_units)
+
+    def get_output_for(self, input, **kwargs):
+        xin_shape = input.shape
+        if input.ndim > 2:
+            # if the input has more than two dimensions, flatten it into a
+            # batch of feature vectors.
+            input = input.flatten(2)
+        activation = np.zeros((input.shape[0], self.shape1[1] * self.shape2[1]))
+        w = self.S.dot(self.V)
+        for i in range(self.manifold._k):
+            activation += apply_mat_to_kron(input,
+                                self.U[:, i].reshape((self.shape1[::-1])).T,
+                                w[i, :].reshape((self.shape2[::-1])).T)
+        return activation

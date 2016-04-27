@@ -128,17 +128,28 @@ class FixedRankEmbeeded(Manifold):
         else:
             raise TypeError("'type' must be 'mat', 'man_elem' or 'tan_vec'")
 
-    def proj(self, X, Z):
+    def proj(self, X, Z, type='mat'):
         U, S, V = X
-        ZV = self.apply_ambient(Z, V.T, type="mat")
+        ZV = self.apply_ambient(Z, V.T, type=type)
         UtZV = U.T.dot(ZV)
-        ZtU = self.apply_ambient_transpose(Z, U, type="mat").T
+        ZtU = self.apply_ambient_transpose(Z, U, type=type).T
+
+        Zproj = (ZV - U.dot(UtZV), UtZV, ZtU - (UtZV.dot(V)))
+        return Zproj
+
+    def from_partial(self, X, dX):
+        U, S, V = X
+        dU, dS, dV = dX
+
+        ZV = dU.dot(np.linalg.inv(S))
+        UtZV = dS
+        ZtU = np.linalg.inv(S).dot(dV)
 
         Zproj = (ZV - U.dot(UtZV), UtZV, ZtU - (UtZV.dot(V)))
         return Zproj
 
     def egrad2rgrad(self, X, Z):
-        return self.proj(X, Z)
+        return self.proj(X, Z, type='mat')
 
     def ehess2rhess(self, X, egrad, ehess, H):
         # TODO same problem as tangent
