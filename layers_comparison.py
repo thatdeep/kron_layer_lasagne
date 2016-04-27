@@ -33,12 +33,14 @@ def build_custom_cnn(input_var=None, widths=None, drop_input=.2,
     # Hidden layers and dropout:
     nonlin = lasagne.nonlinearities.rectify
 
+
     # Convolutional layer with 32 kernels of size 5x5. Strided and padded
     # convolutions are supported as well; see the docstring.
     network = lasagne.layers.Conv2DLayer(
-            network, num_filters=4, filter_size=(3, 3),
+            network, num_filters=1, filter_size=(28, 28),
             nonlinearity=lasagne.nonlinearities.rectify,
             W=lasagne.init.GlorotUniform())
+    """
     # Expert note: Lasagne provides alternative convolutional layers that
     # override Theano's choice of which implementation to use; for details
     # please see http://lasagne.readthedocs.org/en/latest/user/tutorial.html.
@@ -51,7 +53,7 @@ def build_custom_cnn(input_var=None, widths=None, drop_input=.2,
             network, num_filters=4, filter_size=(3, 3),
             nonlinearity=lasagne.nonlinearities.rectify)
     #network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
-
+    """
 
     if drop_hidden:
         network = lasagne.layers.dropout(network, p=drop_hidden)
@@ -108,26 +110,28 @@ def generate_train_acc(input_X=None, target_y=None, widths=None, type="dense", p
 
 def comparison(X_train,y_train,X_val,y_val,X_test,y_test, kron_params=None):
     import pickle
-    kron_params = [{'param_density': p} for p in np.linspace(1.0, 0.0, 2, endpoint=False)] if kron_params is None else kron_params
+    kron_params = [{'param_density': p} for p in np.linspace(0.2, 0.0, 2, endpoint=False)] if kron_params is None else kron_params
     num_epochs = 2
 
     batch_size = 100
 
-    hidden_units = [8]
+    hidden_units = [100]
 
     trains, accs = generate_train_acc(widths=hidden_units, type="dense")
     trains, accs = list(zip(*([(trains, accs)] + [generate_train_acc(widths=hidden_units, type="kron", params=kron_param) for kron_param in kron_params])))
 
     names = ["dense"] + ["kron({})".format(p.values()) for p in kron_params]
-    results = {name: {} for name in names}
+    results = {}
 
-    for train, acc, res in zip(trains, accs, results.values()):
+    for train, acc, name in zip(trains, accs, names):
+        res = {}
         res["train_fun"] = train
         res["accuracy_fun"] = acc
         res["train_err"] = []
         res["train_acc"] = []
         res["epoch_times"] = []
         res["val_acc"] = []
+        results[name] = res
 
     for epoch in range(num_epochs):
         for (res_name, res) in results.items():

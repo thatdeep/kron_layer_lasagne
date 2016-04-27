@@ -6,47 +6,6 @@ import theano.tensor as T
 from manifolds import FixedRankEmbeeded
 
 
-class LowRankStep(theano.gof.Op):
-    __props__ = ('manifold',)
-
-    def __init__(self, manifold):
-        super(LowRankStep, self).__init__()
-        self.manifold = manifold
-
-    def make_node(self, x, u, s, v):
-        return theano.gof.graph.Apply(self, [x, u, s, v], [T.dmatrix()])
-
-    def perform(self, node, inputs, output_storage):
-        xin, u, s, v = inputs
-
-        if xin.ndim > 2:
-            # if the input has more than two dimensions, flatten it into a
-            # batch of feature vectors.
-            xin = np.reshape(xin, (xin.shape[0], -1))
-            #xin = xin.flatten(2)
-
-        activation = xin.dot(u).dot(s).dot(v)
-        xout, = output_storage
-        xout[0] = activation
-
-    def grad(self, input, output_gradients):
-        xin, u, s, v = input
-        xin_shape = xin.shape
-        if xin.ndim > 2:
-            # if the input has more than two dimensions, flatten it into a
-            # batch of feature vectors.
-            xin = xin.flatten(2)
-        out_grad, = output_gradients
-
-        # space issue --- maybe factorize xin and out_grad before dot
-        w_egrad = xin.T.dot(out_grad)
-        w_rgrad = self.manifold.egrad2rgrad((u, s, v), w_egrad)
-
-        xin_grad = out_grad.dot(v.T).dot(s.T).dot(u.T).reshape(xin_shape)
-
-        return [xin_grad] + list(w_rgrad)
-
-
 class LowRankLayer(lasagne.layers.Layer):
     def __init__(self, incoming, num_units, param_density, **kwargs):
         super(LowRankLayer, self).__init__(incoming, **kwargs)
@@ -63,10 +22,9 @@ class LowRankLayer(lasagne.layers.Layer):
         self.U = self.add_param(U, (self.num_inputs, self.r), name="U", regularizable=False)
         self.S = self.add_param(S, (self.r, self.r), name="S", regularizable=True)
         self.V = self.add_param(V, (self.r, self.num_units), name="V", regularizable=False)
-        self.op = LowRankStep(self.manifold)
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], self.num_units)
 
     def get_output_for(self, input, **kwargs):
-        return self.op(input, self.U, self.S, self.V)
+        return input.dot(self.U).dot(self.S).dot(self.V)
