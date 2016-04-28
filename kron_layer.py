@@ -152,7 +152,22 @@ class KronLayer(lasagne.layers.Layer):
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], self.num_units)
 
+    
+    def get_output_for(self, input, **kwargs):
+        xin_shape = input.shape
+        if input.ndim > 2:
+            # if the input has more than two dimensions, flatten it into a
+            # batch of feature vectors.
+            input = input.flatten(2)
+        activation = T.zeros((input.shape[0], self.shape1[1] * self.shape2[1]))
+        w = self.S.dot(self.V)
+        for i in range(self.manifold._k):
+            activation += apply_mat_to_kron(input,
+                                self.U[:, i].reshape((self.shape1[::-1])).T,
+                                w[i, :].reshape((self.shape2[::-1])).T)
+        return activation
 
+'''
     def get_output_for(self, input, **kwargs):
         xin_shape = input.shape
         if input.ndim > 2:
@@ -178,18 +193,4 @@ class KronLayer(lasagne.layers.Layer):
 
         final_activation = accumulated_activation[-1]
         return final_activation
-"""
-    def get_output_for(self, input, **kwargs):
-        xin_shape = input.shape
-        if input.ndim > 2:
-            # if the input has more than two dimensions, flatten it into a
-            # batch of feature vectors.
-            input = input.flatten(2)
-        activation = T.zeros((input.shape[0], self.shape1[1] * self.shape2[1]))
-        w = self.S.dot(self.V)
-        for i in range(self.manifold._k):
-            activation += apply_mat_to_kron(input,
-                                self.U[:, i].reshape((self.shape1[::-1])).T,
-                                w[i, :].reshape((self.shape2[::-1])).T)
-        return activation
-"""
+'''
