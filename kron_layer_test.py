@@ -207,7 +207,7 @@ def build_custom_cnn(input_var=None, widths=None, drop_input=.2,
 
 
 def generate_train_acc(input_X=None, target_y=None, widths=None, type="dense", params=None):
-    input_X = T.tensor4("X") if input_X is None else input_X
+    input_X = T.tensor4("X", dtype='float32') if input_X is None else input_X
     target_y = T.vector("target Y integer", dtype='int32') if target_y is None else target_y
     widths = [100] if widths is None else widths
     params = {'param_density': 0.5 } if params is None else params
