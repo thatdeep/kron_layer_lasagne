@@ -109,12 +109,12 @@ def build_custom_cnn(input_var=None, widths=None, drop_input=0.2,
         manifolds["fixedrank0"] = network.manifold
     elif type == "kron":
         param_density = params.get('param_density', 1.0)
-        shape2 = params.get('shape2', (28, 200))
+        shape2 = params.get('shape2', (28, 100))
         network = KronLayer(network, widths[0], shape2=shape2, param_density=param_density, name="kron_fixedrank0")
         manifolds["kron_fixedrank0"] = network.manifold
     elif type == "old_kron":
         param_density = params.get('param_density', 1.0)
-        shape2 = params.get('shape2', (28, 200))
+        shape2 = params.get('shape2', (28, 100))
         network = OldKronLayer(network, widths[0], shape2=shape2, param_density=param_density, name="old_kron_fixedrank0")
         manifolds["old_kron_fixedrank0"] = network.manifold
     else:
@@ -232,12 +232,12 @@ def generate_train_acc(input_X=None, target_y=None, widths=None, type="dense", p
 
 def comparison(X_train,y_train,X_val,y_val,X_test,y_test, kron_params=None):
     import pickle
-    kron_params = [{'param_density': p} for p in np.linspace(0.2, 0.0, 2, endpoint=False)] if kron_params is None else kron_params
+    kron_params = [{'param_density': p} for p in np.linspace(1.0, 0.0, 2, endpoint=False)] if kron_params is None else kron_params
     num_epochs = 5
 
     batch_size = 100
 
-    hidden_units = [200*200]
+    hidden_units = [100*100]
 
     trains, accs = generate_train_acc(widths=hidden_units, type="dense")
     trains, accs = list(zip(*([(trains, accs)]
