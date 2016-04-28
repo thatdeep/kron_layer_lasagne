@@ -232,7 +232,7 @@ def generate_train_acc(input_X=None, target_y=None, widths=None, type="dense", p
 
 def comparison(X_train,y_train,X_val,y_val,X_test,y_test, kron_params=None):
     import pickle
-    kron_params = [{'param_density': p} for p in np.linspace(1.0, 0.0, 2, endpoint=False)] if kron_params is None else kron_params
+    kron_params = [{'param_density': p} for p in np.linspace(0.2, 0.0, 2, endpoint=False)] if kron_params is None else kron_params
     num_epochs = 5
 
     batch_size = 100
