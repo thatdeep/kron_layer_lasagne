@@ -109,12 +109,12 @@ def build_custom_cnn(input_var=None, widths=None, drop_input=0.2,
         manifolds["fixedrank0"] = network.manifold
     elif type == "kron":
         param_density = params.get('param_density', 1.0)
-        shape2 = params.get('shape2', (28, 100))
+        shape2 = params.get('shape2', (28, 10))
         network = KronLayer(network, widths[0], shape2=shape2, param_density=param_density, name="kron_fixedrank0")
         manifolds["kron_fixedrank0"] = network.manifold
     elif type == "old_kron":
         param_density = params.get('param_density', 1.0)
-        shape2 = params.get('shape2', (28, 100))
+        shape2 = params.get('shape2', (28, 10))
         network = OldKronLayer(network, widths[0], shape2=shape2, param_density=param_density, name="old_kron_fixedrank0")
         manifolds["old_kron_fixedrank0"] = network.manifold
     else:
@@ -207,7 +207,7 @@ def build_custom_cnn(input_var=None, widths=None, drop_input=.2,
 
 
 def generate_train_acc(input_X=None, target_y=None, widths=None, type="dense", params=None):
-    input_X = T.tensor4("X") if input_X is None else input_X
+    input_X = T.tensor4("X", dtype='float32') if input_X is None else input_X
     target_y = T.vector("target Y integer", dtype='int32') if target_y is None else target_y
     widths = [100] if widths is None else widths
     params = {'param_density': 0.5 } if params is None else params
@@ -237,7 +237,7 @@ def comparison(X_train,y_train,X_val,y_val,X_test,y_test, kron_params=None):
 
     batch_size = 100
 
-    hidden_units = [100*100]
+    hidden_units = [10*10]
 
     trains, accs = generate_train_acc(widths=hidden_units, type="dense")
     trains, accs = list(zip(*([(trains, accs)]
