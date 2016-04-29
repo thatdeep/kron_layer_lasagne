@@ -32,6 +32,16 @@ def apply_mat_to_kron(x, a, b):
     res2 = res2.reshape((m, -1))
     return res2
 
+def apply_mat_to_kron(x, a, b):
+    X = x.reshape((x.shape[0], a.shape[0], b.shape[0]))
+    result = T.tensordot(T.tensordot(X, a, axes=([1], [0])), b, axes=([1], [0]))
+    return result.reshape((x.shape[0], -1))
+
+def apply_mat_to_kron_np(x, a, b):
+    X = x.reshape((x.shape[0], a.shape[0], b.shape[0]))
+    result = np.tensordot(np.tensordot(X, a, axes=([1], [0])), b, axes=([1], [0]))
+    return result.reshape((x.shape[0], -1))
+
 
 class KronStep(theano.gof.Op):
     __props__ = ('manifold',)
@@ -56,7 +66,7 @@ class KronStep(theano.gof.Op):
         activation = np.zeros((xin.shape[0], self.shape1[1] * self.shape2[1]))
         w = s.dot(v)
         for i in range(self.manifold._k):
-            activation += apply_mat_to_kron(xin,
+            activation += apply_mat_to_kron_np(xin,
                                 u[:, i].reshape((self.shape1[::-1])).T,
                                 w[i, :].reshape((self.shape2[::-1])).T)
 
@@ -172,13 +182,13 @@ class KronLayer(lasagne.layers.Layer):
                                                                   apply_mat_to_kron(input,
                                                                                     self.U[:, index].reshape((self.shape1[::-1])).T,
                                                                                     w[index, :].reshape((self.shape2[::-1])).T),
-                                          outputs_info=None,
+                                          outputs_info=T.zeros_like(activation),
                                           sequences=[theano.tensor.arange(self.manifold._k)],
                                           non_sequences=activation)
 
         final_activation = accumulated_activation[-1]
         return final_activation
-"""
+
     def get_output_for(self, input, **kwargs):
         xin_shape = input.shape
         if input.ndim > 2:
@@ -192,4 +202,3 @@ class KronLayer(lasagne.layers.Layer):
                                 self.U[:, i].reshape((self.shape1[::-1])).T,
                                 w[i, :].reshape((self.shape2[::-1])).T)
         return activation
-"""

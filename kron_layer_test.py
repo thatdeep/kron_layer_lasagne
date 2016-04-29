@@ -109,12 +109,12 @@ def build_custom_cnn(input_var=None, widths=None, drop_input=0.2,
         manifolds["fixedrank0"] = network.manifold
     elif type == "kron":
         param_density = params.get('param_density', 1.0)
-        shape2 = params.get('shape2', (28, 10))
+        shape2 = params.get('shape2', (28, 100))
         network = KronLayer(network, widths[0], shape2=shape2, param_density=param_density, name="kron_fixedrank0")
         manifolds["kron_fixedrank0"] = network.manifold
     elif type == "old_kron":
         param_density = params.get('param_density', 1.0)
-        shape2 = params.get('shape2', (28, 10))
+        shape2 = params.get('shape2', (28, 100))
         network = OldKronLayer(network, widths[0], shape2=shape2, param_density=param_density, name="old_kron_fixedrank0")
         manifolds["old_kron_fixedrank0"] = network.manifold
     else:
@@ -207,7 +207,7 @@ def build_custom_cnn(input_var=None, widths=None, drop_input=.2,
 
 
 def generate_train_acc(input_X=None, target_y=None, widths=None, type="dense", params=None):
-    input_X = T.tensor4("X", dtype='float32') if input_X is None else input_X
+    input_X = T.tensor4("X") if input_X is None else input_X
     target_y = T.vector("target Y integer", dtype='int32') if target_y is None else target_y
     widths = [100] if widths is None else widths
     params = {'param_density': 0.5 } if params is None else params
@@ -237,7 +237,7 @@ def comparison(X_train,y_train,X_val,y_val,X_test,y_test, kron_params=None):
 
     batch_size = 100
 
-    hidden_units = [10*10]
+    hidden_units = [4*4]
 
     trains, accs = generate_train_acc(widths=hidden_units, type="dense")
     trains, accs = list(zip(*([(trains, accs)]
@@ -298,9 +298,83 @@ def comparison(X_train,y_train,X_val,y_val,X_test,y_test, kron_params=None):
         pickle.dump(results, pickle_file)
 
 
+def run(X_train,y_train,X_val,y_val,X_test,y_test):
+    import pickle
+    import cProfile
+    kron_params = [{'param_density': p} for p in np.linspace(0.0, 0.0, 1, endpoint=False)]
+    num_epochs = 5
+
+    batch_size = 100
+
+    hidden_units = [100**2]
+
+    trains, accs = list(zip(*([generate_train_acc(widths=hidden_units, type="old_kron", params=kron_param) for kron_param in kron_params])))
+
+    names = ["old_kron({})".format(p.values()) for p in kron_params]
+    results = {}
+
+    for train, acc, name in zip(trains, accs, names):
+        res = {}
+        res["train_fun"] = train
+        res["accuracy_fun"] = acc
+        res["train_err"] = []
+        res["train_acc"] = []
+        res["epoch_times"] = []
+        res["val_acc"] = []
+        results[name] = res
+
+    # Just profile if you need
+    pr = cProfile.Profile()
+    pr.enable()
+    for epoch in range(num_epochs):
+        for (res_name, res) in results.items():
+            train_err = 0
+            train_acc = 0
+            train_batches = 0
+            start_time = time.time()
+            for batch in iterate_minibatches(X_train, y_train,batch_size):
+                inputs, targets = batch
+                train_err_batch, train_acc_batch= res["train_fun"](inputs, targets)
+                train_err += train_err_batch
+                train_acc += train_acc_batch
+                train_batches += 1
+
+            # And a full pass over the validation data:
+            val_acc = 0
+            val_batches = 0
+            for batch in iterate_minibatches(X_val, y_val, batch_size):
+                inputs, targets = batch
+                val_acc += res["accuracy_fun"](inputs, targets)
+                val_batches += 1
+
+            # Then we print the results for this epoch:
+            print("for {}".format(res_name))
+            print("Epoch {} of {} took {:.3f}s".format(
+                epoch + 1, num_epochs, time.time() - start_time))
+
+            print("  training loss (in-iteration):\t\t{:.6f}".format(train_err / train_batches))
+            print("  train accuracy:\t\t{:.2f} %".format(
+                train_acc / train_batches * 100))
+            print("  validation accuracy:\t\t{:.2f} %".format(
+                val_acc / val_batches * 100))
+            res["train_err"].append(train_err / train_batches)
+            res["train_acc"].append(train_acc / train_batches * 100)
+            res["val_acc"].append(val_acc / val_batches * 100)
+    # Just profile if you need
+    pr.disable()
+    pr.print_stats(sort='cumtime')
+    for res in results.values():
+        res.pop('train_fun')
+        res.pop('accuracy_fun')
+    with open("comparative_history.dict", 'wb') as pickle_file:
+        pickle.dump(results, pickle_file)
+
+
+
+
 if __name__ == "__main__":
     from mnist import load_dataset
     X_train,y_train,X_val,y_val,X_test,y_test = load_dataset()
     print(X_train.shape,y_train.shape)
 
-    comparison(X_train,y_train,X_val,y_val,X_test,y_test)
+    run(X_train,y_train,X_val,y_val,X_test,y_test)
