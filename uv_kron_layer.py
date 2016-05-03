@@ -29,9 +29,18 @@ class UVKronLayer(lasagne.layers.Layer):
         self.kron_shape = (int(np.prod(self.shape1)), int(np.prod(self.shape2)))
         self.r = rank if use_rank else max(1, int(param_density * min(self.kron_shape)))
 
-        self.U = self.add_param(np.linalg.qr(np.random.normal(size=(self.kron_shape[0], self.r)))[0], shape=(self.num_inputs, self.r), name="U")
-        self.S = self.add_param(np.linalg.qr(np.random.normal(size=(self.r, self.r)))[0], shape=(self.r, self.r), name="S")
-        self.V = self.add_param(np.linalg.qr(np.random.normal(size=(self.kron_shape[1], self.r)))[0], shape=(self.num_units, self.r), name="V")
+        self.U = self.add_param(np.linalg.qr(np.random.normal(size=(self.kron_shape[0], self.r)))[0],
+                                shape=(self.num_inputs, self.r),
+                                name="U",
+                                regularizable=False)
+        self.S = self.add_param(np.linalg.qr(np.random.normal(size=(self.r, self.r)))[0],
+                                shape=(self.r, self.r),
+                                name="S",
+                                regularizable=False)
+        self.V = self.add_param(np.linalg.qr(np.random.normal(size=(self.kron_shape[1], self.r)))[0],
+                                shape=(self.num_units, self.r),
+                                name="V",
+                                regularizable=False)
 
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], self.num_units)
@@ -43,8 +52,9 @@ class UVKronLayer(lasagne.layers.Layer):
             # batch of feature vectors.
             input = input.flatten(2)
         activation = T.zeros((input.shape[0], self.shape1[1] * self.shape2[1]))
+        W = self.U.dot(self.S)
         for i in range(self.r):
             activation += apply_mat_to_kron(input,
-                                self.U[:, i].reshape((self.shape1[::-1])).T,
+                                W[:, i].reshape((self.shape1[::-1])).T,
                                 self.V[:, i].reshape((self.shape2[::-1])).T)
         return activation
