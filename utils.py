@@ -157,6 +157,156 @@ def adam(loss_or_grads, params, learning_rate=0.001, beta1=0.9,
     return updates
 '''
 
+
+def sgd(loss_or_grads, params, learning_rate):
+    """Stochastic Gradient Descent (SGD) updates
+    Generates update expressions of the form:
+    * ``param := param - learning_rate * gradient``
+    Parameters
+    ----------
+    loss_or_grads : symbolic expression or list of expressions
+        A scalar loss expression, or a list of gradient expressions
+    params : list of shared variables
+        The variables to generate update expressions for
+    learning_rate : float or symbolic scalar
+        The learning rate controlling the size of update steps
+    Returns
+    -------
+    OrderedDict
+        A dictionary mapping each parameter to its update expression
+    """
+    grads = lasagne.updates.get_or_compute_grads(loss_or_grads, params)
+    updates = OrderedDict()
+
+    for param, grad in zip(params, grads):
+        updates[param] = param - learning_rate * grad
+
+    return updates
+
+
+def apply_nesterov_momentum(updates, params=None, momentum=0.9, manifolds=None):
+    """Returns a modified update dictionary including Nesterov momentum
+    Generates update expressions of the form:
+    * ``velocity := momentum * velocity + updates[param] - param``
+    * ``param := param + momentum * velocity + updates[param] - param``
+    Parameters
+    ----------
+    updates : OrderedDict
+        A dictionary mapping parameters to update expressions
+    params : iterable of shared variables, optional
+        The variables to apply momentum to. If omitted, will apply
+        momentum to all `updates.keys()`.
+    momentum : float or symbolic scalar, optional
+        The amount of momentum to apply. Higher momentum results in
+        smoothing over more update steps. Defaults to 0.9.
+    Returns
+    -------
+    OrderedDict
+        A copy of `updates` with momentum updates for all `params`.
+    Notes
+    -----
+    Higher momentum also results in larger update steps. To counter that,
+    you can optionally scale your learning rate by `1 - momentum`.
+    The classic formulation of Nesterov momentum (or Nesterov accelerated
+    gradient) requires the gradient to be evaluated at the predicted next
+    position in parameter space. Here, we use the formulation described at
+    https://github.com/lisa-lab/pylearn2/pull/136#issuecomment-10381617,
+    which allows the gradient to be evaluated at the current parameters.
+    See Also
+    --------
+    nesterov_momentum : Shortcut applying Nesterov momentum to SGD updates
+    """
+    manifolds = {} if manifolds is None else manifolds
+    if params is None:
+        params = updates.keys()
+    updates = OrderedDict(updates)
+
+    if isinstance(manifolds, dict) and manifolds:
+
+        for manifold_name in manifolds:
+            manifold_tuple, manifold_grads_tuple = list(zip(*tuple((param, grad) for (param, grad) in zip(params, grads)\
+                                                                   if (hasattr(param, 'name') and manifold_name in param.name))))
+            manifold_tuple = {manifold_name: manifold_tuple}
+            manifold_grads_tuple = {manifold_name: manifold_grads_tuple}
+
+            params, grads = list(zip(*tuple((param, grad) for (param, grad) in zip(params, grads)
+                                            if (hasattr(param, 'name') and manifold_name not in param.name))))
+            params = [manifold_tuple] + list(params)
+            grads = [manifold_grads_tuple] + list(grads)
+
+    for param in params:
+        if param and isinstance(param, dict) and len(param) == 1 and isinstance(list(param.values())[0], tuple):# and "fixed_rank" in param[0].name:
+            manifold_name = list(param.keys())[0]
+            manifold = manifolds[manifold_name]
+            if hasattr(manifold, "from_partial"):
+                param_updates = manifold.retr(param[manifold_name],
+                                              manifold.from_partial(param[manifold_name], grad[manifold_name]),
+                                              -learning_rate)
+            else:
+                param_updates = manifold.retr(param[manifold_name],
+                                              grad[manifold_name],
+                                              -learning_rate)
+            for p, upd in zip(param[manifold_name], param_updates):
+                updates[p] = upd
+            velocity = manifold.zerovec(param[manifold_name])
+            x_tangent = manifold.lincomb(params[manifold_name], momentum, velocity, 1.0, manifold.proj(param[manifold_name], ))
+        else:
+            value = param.get_value(borrow=True)
+            velocity = theano.shared(np.zeros(value.shape, dtype=value.dtype),
+                                     broadcastable=param.broadcastable)
+            x = momentum * velocity + updates[param] - param
+            updates[velocity] = x
+            updates[param] = momentum * x + updates[param]
+
+    for param in params:
+        value = param.get_value(borrow=True)
+        velocity = theano.shared(np.zeros(value.shape, dtype=value.dtype),
+                                 broadcastable=param.broadcastable)
+        x = momentum * velocity + updates[param] - param
+        updates[velocity] = x
+        updates[param] = momentum * x + updates[param]
+
+    return updates
+
+
+def nesterov_momentum(loss_or_grads, params, learning_rate, momentum=0.9):
+    """Stochastic Gradient Descent (SGD) updates with Nesterov momentum
+    Generates update expressions of the form:
+    * ``velocity := momentum * velocity - learning_rate * gradient``
+    * ``param := param + momentum * velocity - learning_rate * gradient``
+    Parameters
+    ----------
+    loss_or_grads : symbolic expression or list of expressions
+        A scalar loss expression, or a list of gradient expressions
+    params : list of shared variables
+        The variables to generate update expressions for
+    learning_rate : float or symbolic scalar
+        The learning rate controlling the size of update steps
+    momentum : float or symbolic scalar, optional
+        The amount of momentum to apply. Higher momentum results in
+        smoothing over more update steps. Defaults to 0.9.
+    Returns
+    -------
+    OrderedDict
+        A dictionary mapping each parameter to its update expression
+    Notes
+    -----
+    Higher momentum also results in larger update steps. To counter that,
+    you can optionally scale your learning rate by `1 - momentum`.
+    The classic formulation of Nesterov momentum (or Nesterov accelerated
+    gradient) requires the gradient to be evaluated at the predicted next
+    position in parameter space. Here, we use the formulation described at
+    https://github.com/lisa-lab/pylearn2/pull/136#issuecomment-10381617,
+    which allows the gradient to be evaluated at the current parameters.
+    See Also
+    --------
+    apply_nesterov_momentum : Function applying momentum to updates
+    """
+    updates = custom_sgd(loss_or_grads, params, learning_rate)
+    return apply_nesterov_momentum(updates, momentum=momentum)
+
+
+
 def iterate_minibatches(X, y, batchsize):
         n_samples = X.shape[0]
 
