@@ -57,6 +57,7 @@ class KronLayer(lasagne.layers.Layer):
     def get_output_shape_for(self, input_shape):
         return (input_shape[0], self.num_units)
 
+    
     def get_output_for(self, input, **kwargs):
         xin_shape = input.shape
         if input.ndim > 2:

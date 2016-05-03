@@ -30,6 +30,7 @@ class UVKronLayer(lasagne.layers.Layer):
         self.r = rank if use_rank else max(1, int(param_density * min(self.kron_shape)))
 
         self.U = self.add_param(np.linalg.qr(np.random.normal(size=(self.kron_shape[0], self.r)))[0], shape=(self.num_inputs, self.r), name="U")
+        self.S = self.add_param(np.linalg.qr(np.random.normal(size=(self.r, self.r)))[0], shape=(self.r, self.r), name="S")
         self.V = self.add_param(np.linalg.qr(np.random.normal(size=(self.kron_shape[1], self.r)))[0], shape=(self.num_units, self.r), name="V")
 
     def get_output_shape_for(self, input_shape):
