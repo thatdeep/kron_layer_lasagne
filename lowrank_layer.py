@@ -7,17 +7,21 @@ from manifolds import FixedRankEmbeeded
 
 
 class LowRankLayer(lasagne.layers.Layer):
-    def __init__(self, incoming, num_units, param_density, **kwargs):
+    def __init__(self, incoming, num_units, rank, params=None, **kwargs):
         super(LowRankLayer, self).__init__(incoming, **kwargs)
 
         num_inputs = int(np.prod(self.input_shape[1:]))
         self.num_inputs = num_inputs
         self.num_units = num_units
         self.shape = (self.num_inputs, self.num_units)
-        self.r = max(1, int(param_density * min(self.shape)))
+        #self.r = max(1, int(param_density * min(self.shape)))
+        self.r = rank
 
         self.manifold = FixedRankEmbeeded(*self.shape, k=self.r)
-        U, S, V = self.manifold.rand_np()
+        if params:
+            U, S, V = params
+        else:
+            U, S, V = self.manifold.rand_np()
         # give proper names
         self.U = self.add_param(U, (self.num_inputs, self.r), name="U", regularizable=False)
         self.S = self.add_param(S, (self.r, self.r), name="S", regularizable=True)

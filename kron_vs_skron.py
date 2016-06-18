@@ -6,7 +6,7 @@ import numpy as np
 import theano.tensor as T
 
 from utils import custom_sgd, iterate_minibatches
-from kron_layer import KronLayer
+from kron_layer import KronLayer, SimpleKronLayer
 from uv_kron_layer import UVKronLayer
 from lowrank_layer import LowRankLayer
 
@@ -88,8 +88,16 @@ def build_custom_mlp(input_var=None, widths=None, drop_input=.2,
                                 param_density=param_density,
                                 rank=rank,
                                 use_rank=use_rank,
-                                name="kron_fixedrank0")
-            manifolds["kron_fixedrank0"] = network.manifold
+                                name="rieman_kron_0")
+            manifolds["rieman_kron_0"] = network.manifold
+        elif type == "skron":
+            network = SimpleKronLayer(network,
+                                widths[0],
+                                shape2=(4, 4),
+                                param_density=param_density,
+                                rank=rank,
+                                use_rank=use_rank,
+                                name="simple_kron_0")
         else:
             raise ValueError("type must be one of 3 variants: 'dense', 'lowrank' or 'kron'")
     for width in widths[1:]:
@@ -122,7 +130,7 @@ def generate_train_acc(input_X=None, target_y=None, widths=None, type="dense", p
     updates_sgd = custom_sgd(loss, all_weights, learning_rate=0.01, manifolds=manifolds)
 
 
-    train_fun = theano.function([input_X,target_y],[loss],updates=updates_sgd)
+    train_fun = theano.function([input_X,target_y],[loss, accuracy],updates=updates_sgd)
     accuracy_fun = theano.function([input_X,target_y],accuracy)
     return train_fun, accuracy_fun
 
@@ -139,9 +147,9 @@ def comparison(X_train,y_train,X_val,y_val,X_test,y_test, kron_params=None):
     trains, accs = generate_train_acc(widths=hidden_units, type="dense")
     trains, accs = list(zip(*([(trains, accs)]
                               + [generate_train_acc(widths=hidden_units, type="kron", params=kron_param) for kron_param in kron_params]
-                              + [generate_train_acc(widths=hidden_units, type="uv_kron", params=kron_param) for kron_param in kron_params])))
+                              + [generate_train_acc(widths=hidden_units, type="skron", params=kron_param) for kron_param in kron_params])))
 
-    names = ["dense"] + ["kron({})".format(p.values()) for p in kron_params] + ["uv_kron({})".format(p.values()) for p in kron_params]
+    names = ["dense"] + ["kron({})".format(p.values()) for p in kron_params] + ["simple_kron({})".format(p.values()) for p in kron_params]
     results = {}
 
     for train, acc, name in zip(trains, accs, names):
@@ -263,7 +271,7 @@ def run(X_train,y_train,X_val,y_val,X_test,y_test):
     for res in results.values():
         res.pop('train_fun')
         res.pop('accuracy_fun')
-    with open("comparative_history.dict", 'wb') as pickle_file:
+    with open("simple_vs_rieman.dict", 'wb') as pickle_file:
         pickle.dump(results, pickle_file)
 
 

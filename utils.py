@@ -40,7 +40,10 @@ def custom_sgd(loss_or_grads, params, learning_rate, manifolds=None):
             manifold_tuple = {manifold_name: manifold_tuple}
             manifold_grads_tuple = {manifold_name: manifold_grads_tuple}
 
-            params, grads = list(zip(*tuple((param, grad) for (param, grad) in zip(params, grads)
+            if len(manifold_tuple[manifold_name]) == len(grads):
+                params, grads = [], []
+            else:
+                params, grads = list(zip(*tuple((param, grad) for (param, grad) in zip(params, grads)
                                             if (hasattr(param, 'name') and manifold_name not in param.name))))
             params = [manifold_tuple] + list(params)
             grads = [manifold_grads_tuple] + list(grads)
@@ -220,56 +223,53 @@ def apply_nesterov_momentum(updates, params=None, momentum=0.9, manifolds=None):
     if params is None:
         params = updates.keys()
     updates = OrderedDict(updates)
+    updates_backup = updates
 
     if isinstance(manifolds, dict) and manifolds:
-
         for manifold_name in manifolds:
-            manifold_tuple, manifold_grads_tuple = list(zip(*tuple((param, grad) for (param, grad) in zip(params, grads)\
-                                                                   if (hasattr(param, 'name') and manifold_name in param.name))))
+            manifold_tuple = tuple(param for param in params if hasattr(param, "name") and manifold_name in param.name)
             manifold_tuple = {manifold_name: manifold_tuple}
-            manifold_grads_tuple = {manifold_name: manifold_grads_tuple}
-
-            params, grads = list(zip(*tuple((param, grad) for (param, grad) in zip(params, grads)
-                                            if (hasattr(param, 'name') and manifold_name not in param.name))))
+            params = [param for param in params if not hasattr(param, "name") or manifold_name not in param.name]
             params = [manifold_tuple] + list(params)
-            grads = [manifold_grads_tuple] + list(grads)
 
     for param in params:
         if param and isinstance(param, dict) and len(param) == 1 and isinstance(list(param.values())[0], tuple):# and "fixed_rank" in param[0].name:
+            print('1')
             manifold_name = list(param.keys())[0]
             manifold = manifolds[manifold_name]
-            if hasattr(manifold, "from_partial"):
-                param_updates = manifold.retr(param[manifold_name],
-                                              manifold.from_partial(param[manifold_name], grad[manifold_name]),
-                                              -learning_rate)
-            else:
-                param_updates = manifold.retr(param[manifold_name],
-                                              grad[manifold_name],
-                                              -learning_rate)
-            for p, upd in zip(param[manifold_name], param_updates):
-                updates[p] = upd
-            velocity = manifold.zerovec(param[manifold_name])
-            x_tangent = manifold.lincomb(params[manifold_name], momentum, velocity, 1.0, manifold.proj(param[manifold_name], ))
+
+            values = [p.get_value(borrow=True) for p in param[manifold_name]]
+            velocity = tuple(theano.shared(np.zeros(v.shape, dtype=v.dtype), broadcastable=p.broadcastable)\
+                             for (v, p) in zip(values, param[manifold_name]))
+            multiplied = manifold.lincomb(param[manifold_name], momentum, velocity)
+            x = manifold.transp(param[manifold_name], [updates[p] for p in param[manifold_name]], multiplied)
+            for v, x_part in zip(velocity, x):
+                updates[v] = x_part
+            upp = [updates[p] for p in param[manifold_name]]
+            result = manifold.retr(upp, manifold.lincomb(upp, momentum, x))
+            for p, r in zip(param[manifold_name], result):
+                updates[p] = r
         else:
+            print('2')
             value = param.get_value(borrow=True)
             velocity = theano.shared(np.zeros(value.shape, dtype=value.dtype),
                                      broadcastable=param.broadcastable)
             x = momentum * velocity + updates[param] - param
             updates[velocity] = x
             updates[param] = momentum * x + updates[param]
-
-    for param in params:
-        value = param.get_value(borrow=True)
-        velocity = theano.shared(np.zeros(value.shape, dtype=value.dtype),
-                                 broadcastable=param.broadcastable)
-        x = momentum * velocity + updates[param] - param
-        updates[velocity] = x
-        updates[param] = momentum * x + updates[param]
-
+    """
+        for param in params:
+            value = param.get_value(borrow=True)
+            velocity = theano.shared(np.zeros(value.shape, dtype=value.dtype),
+                                     broadcastable=param.broadcastable)
+            x = momentum * velocity + updates[param] - param
+            updates[velocity] = x
+            updates[param] = momentum * x + updates[param]
+    """
     return updates
 
 
-def nesterov_momentum(loss_or_grads, params, learning_rate, momentum=0.9):
+def nesterov_momentum(loss_or_grads, params, learning_rate, momentum=0.9, manifolds=None):
     """Stochastic Gradient Descent (SGD) updates with Nesterov momentum
     Generates update expressions of the form:
     * ``velocity := momentum * velocity - learning_rate * gradient``
@@ -302,8 +302,8 @@ def nesterov_momentum(loss_or_grads, params, learning_rate, momentum=0.9):
     --------
     apply_nesterov_momentum : Function applying momentum to updates
     """
-    updates = custom_sgd(loss_or_grads, params, learning_rate)
-    return apply_nesterov_momentum(updates, momentum=momentum)
+    updates = custom_sgd(loss_or_grads, params, learning_rate, manifolds=manifolds)
+    return apply_nesterov_momentum(updates, momentum=momentum, manifolds=manifolds)
 
 
 

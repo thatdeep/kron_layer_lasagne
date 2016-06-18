@@ -6,9 +6,8 @@ import numpy as np
 import theano.tensor as T
 
 from utils import custom_sgd, iterate_minibatches
-from kron_layer import KronLayer
 from lowrank_layer import LowRankLayer
-from multi_kron_layer import MultiKronLayer
+from multi_kron_layer import MultiKronLayer, MultiSimpleKronLayer
 
 
 def build_custom_cnn(input_var=None, widths=None, drop_input=.2,
@@ -71,6 +70,10 @@ def build_custom_cnn(input_var=None, widths=None, drop_input=.2,
         mode = params.get('mode', 'f')
         network = MultiKronLayer(network, widths[0], mode=mode, param_density=param_density, name="kron_fixedrank0")
         manifolds.update(network.manifolds)
+    elif type == "skron":
+        param_density = params.get('param_density', 1.0)
+        mode = params.get('mode', 'f')
+        network = MultiSimpleKronLayer(network, widths[0], mode=mode, param_density=param_density, name="skron_fixedrank0")
     else:
         raise ValueError("type must be one of 3 variants: 'dense', 'lowrank' or 'kron'")
     for width in widths[1:]:

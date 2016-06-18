@@ -168,10 +168,12 @@ class FixedRankEmbeeded(Manifold):
         raise NotImplementedError("method is not imlemented")
 
     def tangent2ambient(self, X, Z):
-        U = tensor.stack((X.U.dot(Z.M) + Z.Up, X.U), 0).reshape((-1, X.U.shape[1]))
+        XU, XS, XV = X
+        ZUp, ZM, ZVp = Z
+        U = tensor.stack((XU.dot(ZM) + ZUp, XU), 1).reshape((XU.shape[0], -1))
         #U = np.hstack((X.U.dot(Z.M) + Z.Up, X.U))
         S = tensor.eye(2*self._k)
-        V = tensor.stack((X.V, Z.Vp), 1).reshape((X.V.shape[0], -1))
+        V = tensor.stack((XV, ZVp), 0).reshape((-1, XV.shape[1]))
         #V = np.vstack((X.V, Z.Vp))
         return (U, S, V)
 
@@ -263,7 +265,7 @@ class FixedRankEmbeeded(Manifold):
         raise NotImplementedError
 
     def transp(self, x1, x2, d):
-        return self.proj(x2, self.tangent2ambient(x1, d))
+        return self.proj(x2, self.tangent2ambient(x1, d), type='tan_vec')
 
     def lincomb(self, X, a1, u1, a2=None, u2=None):
         Up1, M1, Vp1 = u1
