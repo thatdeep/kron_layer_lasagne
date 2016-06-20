@@ -28,6 +28,11 @@ class LowRankLayer(lasagne.layers.Layer):
         return (input_shape[0], self.num_units)
 
     def get_output_for(self, input, **kwargs):
+        xin_shape = input.shape
+        if input.ndim > 2:
+            # if the input has more than two dimensions, flatten it into a
+            # batch of feature vectors.
+            input = input.flatten(2)
         return input.dot(self.U).dot(self.S).dot(self.V)
 
 
@@ -52,4 +57,9 @@ class SimpleLowRankLayer(lasagne.layers.Layer):
         return (input_shape[0], self.num_units)
 
     def get_output_for(self, input, **kwargs):
+        xin_shape = input.shape
+        if input.ndim > 2:
+            # if the input has more than two dimensions, flatten it into a
+            # batch of feature vectors.
+            input = input.flatten(2)
         return input.dot(self.U).dot(self.S).dot(self.V)
