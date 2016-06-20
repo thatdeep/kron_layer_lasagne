@@ -8,7 +8,7 @@ import theano.tensor as T
 from utils import custom_sgd, iterate_minibatches
 from kron_layer import KronLayer, SimpleKronLayer
 from uv_kron_layer import UVKronLayer
-from lowrank_layer import LowRankLayer
+from lowrank_layer import LowRankLayer, SimpleLowRankLayer
 
 
 def build_custom_mlp(input_var=None, widths=None, drop_input=.2,
@@ -41,7 +41,7 @@ def build_custom_mlp(input_var=None, widths=None, drop_input=.2,
     # Convolutional layer with 32 kernels of size 5x5. Strided and padded
     # convolutions are supported as well; see the docstring.
     network = lasagne.layers.Conv2DLayer(
-            network, num_filters=32, filter_size=(5, 5),
+            network, num_filters=8, filter_size=(5, 5),
             stride=1, pad=2,
             nonlinearity=lasagne.nonlinearities.rectify,
             W=lasagne.init.GlorotUniform())
@@ -52,7 +52,7 @@ def build_custom_mlp(input_var=None, widths=None, drop_input=.2,
 
     # Another convolution with 32 5x5 kernels, and another 2x2 pooling:
     network = lasagne.layers.Conv2DLayer(
-            network, num_filters=64, filter_size=(5, 5),
+            network, num_filters=8, filter_size=(5, 5),
             stride=1, pad=2,
             nonlinearity=lasagne.nonlinearities.rectify)
     network = lasagne.layers.MaxPool2DLayer(network, pool_size=(2, 2))
@@ -71,8 +71,15 @@ def build_custom_mlp(input_var=None, widths=None, drop_input=.2,
                                    param_density=param_density,
                                    rank=rank,
                                    use_rank=use_rank,
-                                   name="fixedrank0")
+                                   name="low_rank_0")
             manifolds["fixedrank0"] = network.manifold
+        if type == "slowrank":
+            network = LowRankLayer(network,
+                                   widths[0],
+                                   param_density=param_density,
+                                   rank=rank,
+                                   use_rank=use_rank,
+                                   name="s_low_rank_0")
         elif type == "uv_kron":
             network = UVKronLayer(network,
                                   widths[0],
@@ -146,8 +153,8 @@ def comparison(X_train,y_train,X_val,y_val,X_test,y_test, kron_params=None):
 
     trains, accs = generate_train_acc(widths=hidden_units, type="dense")
     trains, accs = list(zip(*([(trains, accs)]
-                              + [generate_train_acc(widths=hidden_units, type="kron", params=kron_param) for kron_param in kron_params]
-                              + [generate_train_acc(widths=hidden_units, type="skron", params=kron_param) for kron_param in kron_params])))
+                              + [generate_train_acc(widths=hidden_units, type="lowrank", params=kron_param) for kron_param in kron_params]
+                              + [generate_train_acc(widths=hidden_units, type="slowrank", params=kron_param) for kron_param in kron_params])))
 
     names = ["dense"] + ["kron({})".format(p.values()) for p in kron_params] + ["simple_kron({})".format(p.values()) for p in kron_params]
     results = {}
