@@ -137,13 +137,40 @@ class FixedRankEmbeeded(Manifold):
         Zproj = (ZV - U.dot(UtZV), UtZV, ZtU - (UtZV.dot(V)))
         return Zproj
 
+    def from_partial_old(self, X, dX):
+        eps = 1e-10#np.spacing(1)
+        U, S, V = X
+        dU, dS, dV = dX
+        S = tensor.diag(S)
+        S_pinv = tensor.switch(tensor.gt(abs(S), eps), 1.0 / S, 0.0)
+        S_pinv = tensor.diag(S_pinv)
+        ZV = dU.dot(S_pinv)
+        UtZV = dS
+        ZtU = S_pinv.dot(dV)
+
+        Zproj = (ZV - U.dot(UtZV), UtZV, ZtU - (UtZV.dot(V)))
+        return Zproj
+
     def from_partial(self, X, dX):
+        eps=1e-10
         U, S, V = X
         dU, dS, dV = dX
 
-        ZV = dU.dot(tensor.diag(1.0 / tensor.diag(S)))
+        umask = 1 - (1 - tensor.isnan(dU)) * (1 - tensor.isinf(dU)) # indicators of nan/inf values
+        vmask = 1 - (1 - tensor.isnan(dV)) * (1 - tensor.isinf(dV)) # indicators of nan/inf values
+
+        # U S V => U mask product by columns, V by rows
+        smask = 1 - tensor.prod(1 - umask, axis=0) * tensor.prod(1 - vmask, axis=1)
+        S = tensor.diag(S)
+
+        dU = tensor.set_subtensor(dU[umask.nonzero()], 0.0)
+        S_pinv = tensor.switch(tensor.gt(abs(S), eps), 1.0 / S, 0.0)
+        S_pinv = tensor.set_subtensor(S_pinv[smask.nonzero()], 0.0)
+        S_pinv = tensor.diag(S_pinv)
+        dV = tensor.set_subtensor(dV[vmask.nonzero()], 0.0)
+        ZV = dU.dot(S_pinv)
         UtZV = dS
-        ZtU = tensor.diag(1.0 / tensor.diag(S)).dot(dV)
+        ZtU = S_pinv.dot(dV)
 
         Zproj = (ZV - U.dot(UtZV), UtZV, ZtU - (UtZV.dot(V)))
         return Zproj
