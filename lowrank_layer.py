@@ -50,7 +50,7 @@ class SimpleLowRankLayer(lasagne.layers.Layer):
         U, S, V = FixedRankEmbeeded(*self.shape, k=self.r).rand_np()
         # give proper names
         self.U = self.add_param(U, (self.num_inputs, self.r), name="U", regularizable=False)
-        self.S = self.add_param(S, (self.r, self.r), name="S", regularizable=True)
+        #self.S = self.add_param(S, (self.r, self.r), name="S", regularizable=True)
         self.V = self.add_param(V, (self.r, self.num_units), name="V", regularizable=False)
 
     def get_output_shape_for(self, input_shape):
@@ -62,4 +62,4 @@ class SimpleLowRankLayer(lasagne.layers.Layer):
             # if the input has more than two dimensions, flatten it into a
             # batch of feature vectors.
             input = input.flatten(2)
-        return input.dot(self.U).dot(self.S).dot(self.V)
+        return input.dot(self.U).dot(self.V)
